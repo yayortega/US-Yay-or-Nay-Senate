@@ -469,9 +469,7 @@
       }
     }
 
-    // UPDATED WIKIPEDIA FULL-PAGE TABLE PARSER
     async function syncWikipediaSenateCounts() {
-      // Scans all page tables without restricting to section=2
       const apiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_current_United_States_senators&prop=text&format=json&origin=*";
       
       try {
@@ -490,35 +488,68 @@
         const tables = doc.querySelectorAll("table.wikitable");
         
         tables.forEach(table => {
-          const rows = table.querySelectorAll("tr");
-          rows.forEach(row => {
-            const text = row.textContent.replace(/\s+/g, ' ').trim();
+          // Look specifically at tables that summarize Party Affiliation
+          const tableText = table.textContent.replace(/\s+/g, ' ').trim();
+          if (tableText.includes("Affiliation") || tableText.includes("Party")) {
             
-            // Exclude leadership rows (Leader, Whip) to target the party breakdown table accurately
-            if (text.includes("Republican") && !text.includes("Leader") && !text.includes("Whip")) {
-              const match = text.match(/Republican[^\d]*(\d+)/i);
-              if (match) repSeats = parseInt(match[1], 10);
-            } 
-            if ((text.includes("Democratic") || text.includes("Independent")) && !text.includes("Leader") && !text.includes("Whip")) {
-              const match = text.match(/(?:Democratic|Independent)[^\d]*(\d+)/i);
-              if (match) {
-                const count = parseInt(match[1], 10);
-                if (count > 0 && count < 100) {
-                  demSeats += count;
+            let tempGop = 0;
+            let tempDemInd = 0;
+
+            const rows = table.querySelectorAll("tr");
+            rows.forEach(row => {
+              const rowText = row.textContent.replace(/\s+/g, ' ').trim();
+              
+              // Skip leadership rows and total/summary rows that duplicate numbers
+              const isLeadershipOrTotal = /Leader|Whip|President|Chair|Secretary|Total/i.test(rowText);
+              
+              if (!isLeadershipOrTotal) {
+                // Republican count
+                if (rowText.includes("Republican")) {
+                  const gopMatch = rowText.match(/Republican[^\d]*(\d+)/i);
+                  if (gopMatch) {
+                    const val = parseInt(gopMatch[1], 10);
+                    if (val > 0 && val <= 100) tempGop = val;
+                  }
+                }
+
+                // Democratic count
+                if (rowText.includes("Democratic")) {
+                  const demMatch = rowText.match(/Democratic[^\d]*(\d+)/i);
+                  if (demMatch) {
+                    const val = parseInt(demMatch[1], 10);
+                    if (val > 0 && val <= 100) tempDemInd += val;
+                  }
+                }
+
+                // Independent count (caucusing with Democrats)
+                if (rowText.includes("Independent")) {
+                  const indMatch = rowText.match(/Independent[^\d]*(\d+)/i);
+                  if (indMatch) {
+                    const val = parseInt(indMatch[1], 10);
+                    if (val > 0 && val <= 100) tempDemInd += val;
+                  }
                 }
               }
+            });
+
+            // If this specific table yielded a valid 100-seat sum, lock it in!
+            if (tempGop > 0 && tempDemInd > 0 && (tempGop + tempDemInd === 100)) {
+              repSeats = tempGop;
+              demSeats = tempDemInd;
             }
-          });
+          }
         });
 
-        console.log(`Parsed Wikipedia Seat Breakdown -> NAY (GOP): ${repSeats}, YAY (DEM/IND): ${demSeats}`);
+        console.log(`Parsed Live Senate Counts -> GOP/NAY: ${repSeats}, DEM+IND/YAY: ${demSeats}`);
 
-        // Update gauge automatically if valid counts totaling 100 are extracted
+        // Update gauge automatically
         if (repSeats > 0 && demSeats > 0 && (repSeats + demSeats === 100)) {
           currentNay = repSeats;
           currentYay = demSeats;
           renderUI();
-          console.log("Gauge updated successfully from Wikipedia.");
+          console.log("Gauge successfully updated from Wikipedia!");
+        } else {
+          console.warn(`Parsed counts (${repSeats} GOP + ${demSeats} DEM/IND = ${repSeats + demSeats}) did not equal 100.`);
         }
       } catch (err) {
         console.log("Auto-sync bypassed, manual controls ready.", err);
