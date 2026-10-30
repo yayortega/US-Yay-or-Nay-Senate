@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>USA👍👎?</title>
+<!-- Apple iOS Home Screen Icon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+
+  <!-- Android / Chrome Home Screen Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon.png">
+
+  <!-- Mobile Web App Capable Settings -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="USA👍👎?">	
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
     <style>
@@ -413,7 +424,7 @@
         currentNay = 100 - currentYay;
       } else {
         currentNay = Math.max(0, Math.min(100, currentNay + delta));
-        currentYay = 100 - currentNay;
+        currentYay = 100 - currentYay;
       }
       renderUI();
     }
@@ -469,6 +480,33 @@
       }
     }
 
+    // SUSPENSEFUL WOBBLE ANIMATION WITH A 2-SECOND POST-WOBBLE PAUSE
+    function triggerSuspensefulSync() {
+      const needle = document.getElementById('needle');
+      const diff = currentYay - currentNay;
+      const baseAngle = Math.max(-80, Math.min(80, diff * 5.2));
+
+      // 1. Playful 1-second wiggle sequence
+      needle.style.transform = `rotate(${baseAngle + 7}deg)`;
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle - 7}deg)`; }, 150);
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle + 5}deg)`; }, 300);
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle - 5}deg)`; }, 450);
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle + 3}deg)`; }, 600);
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle - 3}deg)`; }, 750);
+      setTimeout(() => { needle.style.transform = `rotate(${baseAngle + 2}deg)`; }, 900);
+      
+      // 2. Return needle to rest position at 1050ms
+      setTimeout(() => { 
+        needle.style.transform = `rotate(${baseAngle}deg)`; 
+      }, 1050);
+
+      // 3. Wait a full 2000ms (2 seconds) AFTER resting before fetching fresh data (3050ms total)
+      setTimeout(() => { 
+        syncWikipediaSenateCounts();
+      }, 3050);
+    }
+
+    // WIKIPEDIA PARTY AFFILIATION TABLE PARSER
     async function syncWikipediaSenateCounts() {
       const apiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_current_United_States_senators&prop=text&format=json&origin=*";
       
@@ -488,7 +526,6 @@
         const tables = doc.querySelectorAll("table.wikitable");
         
         tables.forEach(table => {
-          // Look specifically at tables that summarize Party Affiliation
           const tableText = table.textContent.replace(/\s+/g, ' ').trim();
           if (tableText.includes("Affiliation") || tableText.includes("Party")) {
             
@@ -498,12 +535,9 @@
             const rows = table.querySelectorAll("tr");
             rows.forEach(row => {
               const rowText = row.textContent.replace(/\s+/g, ' ').trim();
-              
-              // Skip leadership rows and total/summary rows that duplicate numbers
               const isLeadershipOrTotal = /Leader|Whip|President|Chair|Secretary|Total/i.test(rowText);
               
               if (!isLeadershipOrTotal) {
-                // Republican count
                 if (rowText.includes("Republican")) {
                   const gopMatch = rowText.match(/Republican[^\d]*(\d+)/i);
                   if (gopMatch) {
@@ -512,7 +546,6 @@
                   }
                 }
 
-                // Democratic count
                 if (rowText.includes("Democratic")) {
                   const demMatch = rowText.match(/Democratic[^\d]*(\d+)/i);
                   if (demMatch) {
@@ -521,7 +554,6 @@
                   }
                 }
 
-                // Independent count (caucusing with Democrats)
                 if (rowText.includes("Independent")) {
                   const indMatch = rowText.match(/Independent[^\d]*(\d+)/i);
                   if (indMatch) {
@@ -532,7 +564,6 @@
               }
             });
 
-            // If this specific table yielded a valid 100-seat sum, lock it in!
             if (tempGop > 0 && tempDemInd > 0 && (tempGop + tempDemInd === 100)) {
               repSeats = tempGop;
               demSeats = tempDemInd;
@@ -542,28 +573,23 @@
 
         console.log(`Parsed Live Senate Counts -> GOP/NAY: ${repSeats}, DEM+IND/YAY: ${demSeats}`);
 
-        // Update gauge automatically
         if (repSeats > 0 && demSeats > 0 && (repSeats + demSeats === 100)) {
           currentNay = repSeats;
           currentYay = demSeats;
           renderUI();
           console.log("Gauge successfully updated from Wikipedia!");
-        } else {
-          console.warn(`Parsed counts (${repSeats} GOP + ${demSeats} DEM/IND = ${repSeats + demSeats}) did not equal 100.`);
         }
       } catch (err) {
         console.log("Auto-sync bypassed, manual controls ready.", err);
       }
     }
 
-    // Initial render
+    // Initial render & immediate load
     renderUI();
-    
-    // Fetch live counts immediately on page load
     syncWikipediaSenateCounts();
 
-    // Automatically re-sync every 60 seconds (60000 ms)
-    setInterval(syncWikipediaSenateCounts, 60000);
+    // Automatically re-sync every 30 seconds, preceded by the bounce animation!
+    setInterval(triggerSuspensefulSync, 30000);
   </script>
 </body>
 </html>
