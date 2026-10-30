@@ -413,7 +413,7 @@
         currentNay = 100 - currentYay;
       } else {
         currentNay = Math.max(0, Math.min(100, currentNay + delta));
-        currentYay = 100 - currentYay;
+        currentYay = 100 - currentNay;
       }
       renderUI();
     }
@@ -447,7 +447,6 @@
         hubEl.style.fill = 'var(--yellow-color)';
       }
 
-      // ACCELERATED ROTATION: 5.2 degrees per seat difference with visible bounce
       const rawAngle = diff * 5.2;
       const angle = Math.max(-80, Math.min(80, rawAngle));
       document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
@@ -470,21 +469,65 @@
       }
     }
 
-    // SAFE BACKGROUND API FETCH (Does not alter DOM structure or crash UI if offline)
-    async function fetchWikipediaData() {
+    // AUTOMATIC WIKIPEDIA PARTY AFFILIATION TABLE PARSER
+    async function syncWikipediaSenateCounts() {
+      const apiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_current_United_States_senators&prop=text&section=2&format=json&origin=*";
+      
       try {
-        const response = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/United_States_Senate");
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Wikipedia API Connected Successfully:", data.title);
+        const response = await fetch(apiUrl);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const htmlText = data.parse.text['*'];
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, "text/html");
+        
+        // Find the Party Affiliation table
+        const table = doc.querySelector("table.wikitable");
+        if (!table) return;
+
+        let repSeats = 0;
+        let demSeats = 0;
+
+        const rows = table.querySelectorAll("tr");
+        rows.forEach(row => {
+          const cells = row.querySelectorAll("td, th");
+          if (cells.length >= 2) {
+            const partyName = cells[0].textContent.trim();
+            const countText = cells[1].textContent.trim();
+            const count = parseInt(countText, 10);
+
+            if (!isNaN(count)) {
+              if (partyName.includes("Republican")) {
+                repSeats = count;
+              } else if (partyName.includes("Democratic") || partyName.includes("Independent")) {
+                demSeats += count;
+              }
+            }
+          }
+        });
+
+        // Automatically update the gauge if numbers are parsed successfully
+        if (repSeats > 0 && demSeats > 0 && (repSeats + demSeats === 100)) {
+          console.log(`Auto-Synced Wikipedia Counts -> NAY(GOP): ${repSeats}, YAY(DEM): ${demSeats}`);
+          currentNay = repSeats;
+          currentYay = demSeats;
+          renderUI();
         }
-      } catch (error) {
-        console.log("API connection skipped or offline. Local simulator running normally.");
+      } catch (err) {
+        console.log("Auto-sync bypassed, manual controls ready.", err);
       }
     }
 
+    // Initial render
     renderUI();
-    fetchWikipediaData();
+    
+    // Fetch live counts immediately on page load
+    syncWikipediaSenateCounts();
+
+    // Automatically re-sync every 60 seconds (60000 ms)
+    setInterval(syncWikipediaSenateCounts, 60000);
   </script>
 </body>
 </html>
