@@ -470,7 +470,21 @@
       }
     }
 
+    // SAFE BACKGROUND API FETCH (Does not alter DOM structure or crash UI if offline)
+    async function fetchWikipediaData() {
+      try {
+        const response = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/United_States_Senate");
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Wikipedia API Connected Successfully:", data.title);
+        }
+      } catch (error) {
+        console.log("API connection skipped or offline. Local simulator running normally.");
+      }
+    }
+
     renderUI();
+    fetchWikipediaData();
   </script>
 </body>
 </html>
