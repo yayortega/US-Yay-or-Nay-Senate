@@ -469,9 +469,10 @@
       }
     }
 
-    // AUTOMATIC WIKIPEDIA PARTY AFFILIATION TABLE PARSER
+    // UPDATED WIKIPEDIA FULL-PAGE TABLE PARSER
     async function syncWikipediaSenateCounts() {
-      const apiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_current_United_States_senators&prop=text&section=2&format=json&origin=*";
+      // Scans all page tables without restricting to section=2
+      const apiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_current_United_States_senators&prop=text&format=json&origin=*";
       
       try {
         const response = await fetch(apiUrl);
@@ -483,37 +484,41 @@
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, "text/html");
         
-        // Find the Party Affiliation table
-        const table = doc.querySelector("table.wikitable");
-        if (!table) return;
-
         let repSeats = 0;
         let demSeats = 0;
 
-        const rows = table.querySelectorAll("tr");
-        rows.forEach(row => {
-          const cells = row.querySelectorAll("td, th");
-          if (cells.length >= 2) {
-            const partyName = cells[0].textContent.trim();
-            const countText = cells[1].textContent.trim();
-            const count = parseInt(countText, 10);
-
-            if (!isNaN(count)) {
-              if (partyName.includes("Republican")) {
-                repSeats = count;
-              } else if (partyName.includes("Democratic") || partyName.includes("Independent")) {
-                demSeats += count;
+        const tables = doc.querySelectorAll("table.wikitable");
+        
+        tables.forEach(table => {
+          const rows = table.querySelectorAll("tr");
+          rows.forEach(row => {
+            const text = row.textContent.replace(/\s+/g, ' ').trim();
+            
+            // Exclude leadership rows (Leader, Whip) to target the party breakdown table accurately
+            if (text.includes("Republican") && !text.includes("Leader") && !text.includes("Whip")) {
+              const match = text.match(/Republican[^\d]*(\d+)/i);
+              if (match) repSeats = parseInt(match[1], 10);
+            } 
+            if ((text.includes("Democratic") || text.includes("Independent")) && !text.includes("Leader") && !text.includes("Whip")) {
+              const match = text.match(/(?:Democratic|Independent)[^\d]*(\d+)/i);
+              if (match) {
+                const count = parseInt(match[1], 10);
+                if (count > 0 && count < 100) {
+                  demSeats += count;
+                }
               }
             }
-          }
+          });
         });
 
-        // Automatically update the gauge if numbers are parsed successfully
+        console.log(`Parsed Wikipedia Seat Breakdown -> NAY (GOP): ${repSeats}, YAY (DEM/IND): ${demSeats}`);
+
+        // Update gauge automatically if valid counts totaling 100 are extracted
         if (repSeats > 0 && demSeats > 0 && (repSeats + demSeats === 100)) {
-          console.log(`Auto-Synced Wikipedia Counts -> NAY(GOP): ${repSeats}, YAY(DEM): ${demSeats}`);
           currentNay = repSeats;
           currentYay = demSeats;
           renderUI();
+          console.log("Gauge updated successfully from Wikipedia.");
         }
       } catch (err) {
         console.log("Auto-sync bypassed, manual controls ready.", err);
