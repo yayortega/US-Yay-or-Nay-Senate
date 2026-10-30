@@ -338,8 +338,8 @@
           </linearGradient>
         </defs>
 
-        <!-- Overhead 51 Majority Marker -->
-        <text x="150" y="20" class="majority-badge" text-anchor="middle">51 MAJORITY</text>
+        <!-- Overhead EVEN -->
+        <text x="150" y="20" class="majority-badge" text-anchor="middle">EVEN</text>
         <line x1="150" y1="24" x2="150" y2="38" class="majority-line" />
 
         <!-- Gauge Background Arc -->
@@ -372,7 +372,7 @@
           <div id="nayCount" class="seat-val nay">50</div>
         </div>
         <div class="seat-card">
-          <div class="seat-label">NET BAL</div>
+          <div class="seat-label">CUSHION</div>
           <div id="balCount" class="seat-val bal">EVEN</div>
         </div>
         <div class="seat-card yay">
@@ -419,15 +419,15 @@
     let currentYay = 50;
 
     function adjustSeat(type, delta) {
-      if (type === 'yay') {
-        currentYay = Math.max(0, Math.min(100, currentYay + delta));
-        currentNay = 100 - currentYay;
-      } else {
-        currentNay = Math.max(0, Math.min(100, currentNay + delta));
-        currentYay = 100 - currentYay;
-      }
-      renderUI();
-    }
+  if (type === 'yay') {
+    currentYay = Math.max(0, Math.min(100, currentYay + delta));
+    currentNay = 100 - currentYay;
+  } else {
+    currentNay = Math.max(0, Math.min(100, currentNay + delta));
+    currentYay = 100 - currentNay; // Fixed to subtract currentNay from 100
+  }
+  renderUI();
+}
 
     function setSeats(nay, yay) {
       currentNay = nay;
@@ -444,15 +444,19 @@
       const pillEl = document.getElementById('statusPill');
       const hubEl = document.getElementById('needleHub');
 
-      if (diff > 0) {
-        balEl.innerText = `+${diff} YAY`;
-        balEl.className = 'seat-val yay';
-        hubEl.style.fill = 'var(--blue-color)';
-      } else if (diff < 0) {
-        balEl.innerText = `+${Math.abs(diff)} NAY`;
+      // MAJORITY CUSHION CALCULATION (Threshold: 51 seats)
+      if (currentNay >= 51) {
+        const cushion = currentNay - 51;
+        balEl.innerText = `+${cushion} NAY`;
         balEl.className = 'seat-val nay';
         hubEl.style.fill = 'var(--red-color)';
+      } else if (currentYay >= 51) {
+        const cushion = currentYay - 51;
+        balEl.innerText = `+${cushion} YAY`;
+        balEl.className = 'seat-val yay';
+        hubEl.style.fill = 'var(--blue-color)';
       } else {
+        // Tied or 50-50 split (no party at 51+)
         balEl.innerText = 'EVEN';
         balEl.className = 'seat-val bal';
         hubEl.style.fill = 'var(--yellow-color)';
