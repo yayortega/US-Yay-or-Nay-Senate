@@ -514,46 +514,49 @@ input:checked + .slider:before {
     function playSeatChangeAudio(type) {
       if (!soundEnabled) return;
 
+      // If it's a synth test ping, jump straight to the Web Audio tone generator
+      if (type === 'synth') {
+        playSynthFallback('yay');
+        return;
+      }
+
       const targetAudio = (type === 'yay') ? yayAudio : nayAudio;
-      
-      // Reset audio playback position so rapid seat updates fire immediately
       targetAudio.currentTime = 0;
 
-      targetAudio.play().then(() => {
-        // Successfully played custom MP3 file!
-      }).catch(() => {
-        // FALLBACK: Web Audio Synthesizer if MP3 files are missing or blocked
-        try {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContext) return;
-          const ctx = new AudioContext();
-
-          const playTone = (freq, startTime, duration) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
-            gain.gain.setValueAtTime(0.15, ctx.currentTime + startTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime + startTime);
-            osc.stop(ctx.currentTime + startTime + duration);
-          };
-
-          if (type === 'yay') {
-            // High ascending chime for YAY
-            playTone(523.25, 0, 0.15);    // C5
-            playTone(659.25, 0.12, 0.25);  // E5
-          } else {
-            // Deeper descending chime for NAY
-            playTone(440.00, 0, 0.15);    // A4
-            playTone(349.23, 0.12, 0.25);  // F4
-          }
-        } catch (e) {
-          // Audio waiting for initial user interaction
-        }
+      targetAudio.play().catch(() => {
+        // Fallback to synth tones if MP3 files fail to load
+        playSynthFallback(type);
       });
+    }
+
+    // Helper for Web Audio Synthesizer Tones
+    function playSynthFallback(type) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        const playTone = (freq, startTime, duration) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + startTime);
+          osc.stop(ctx.currentTime + startTime + duration);
+        };
+
+        if (type === 'yay') {
+          playTone(523.25, 0, 0.15);    // High ascending tone (C5/E5)
+          playTone(659.25, 0.12, 0.25);
+        } else {
+          playTone(440.00, 0, 0.15);    // Lower descending tone (A4/F4)
+          playTone(349.23, 0.12, 0.25);
+        }
+      } catch (e) {}
     }
 
     function adjustSeat(type, delta) {
