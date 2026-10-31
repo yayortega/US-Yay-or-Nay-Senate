@@ -305,6 +305,72 @@
     }
 
     .btn-preset:active { transform: scale(0.96); }
+
+    /* COMPACT SOUND TOGGLE STYLES */
+.sound-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toggle-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: rgb(255, 208, 0);
+}
+
+/* The Switch Container */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+}
+
+/* Hide default browser checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The Slider Track */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: 0.3s ease;
+  border-radius: 20px;
+}
+
+/* The Slider Knob */
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: 0.3s ease;
+  border-radius: 50%;
+}
+
+/* Checked State (Active / Green or Accent Color) */
+input:checked + .slider {
+  background-color: #10b981; /* Soft emerald green for ON */
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
   </style>
 </head>
 <body>
@@ -362,6 +428,15 @@
         <circle cx="150" cy="160" r="10" id="needleHub" class="needle-hub" />
       </svg>
 
+      <!-- Compact Sound Toggle Switch -->
+        <div class="sound-toggle-wrapper">
+        <span class="toggle-label">AUDIO</span>
+        <label class="switch">
+    <input type="checkbox" id="soundToggle" checked onchange="toggleSound()">
+    <span class="slider round"></span>
+  </label>
+</div>
+
       <!-- Central Status Pill -->
       <div id="statusPill" class="status-pill">TOSS-UP / EVEN (50-50)</div>
 
@@ -417,6 +492,69 @@
   <script>
     let currentNay = 50;
     let currentYay = 50;
+    let prevNay = null;
+    let prevYay = null;
+    let soundEnabled = true;
+
+    // Load custom MP3s from root folder
+    const yayAudio = new Audio('yay.mp3');
+    const nayAudio = new Audio('nay.mp3');
+
+    function toggleSound() {
+      const toggle = document.getElementById('soundToggle');
+      soundEnabled = toggle ? toggle.checked : true;
+      
+      if (soundEnabled) {
+        // Play a quick test sound to unlock mobile audio context on tap
+        playSeatChangeAudio('yay');
+      }
+    }
+
+    // DUAL AUDIO PLAYBACK (Custom MP3s with Synthesized Fallbacks)
+    function playSeatChangeAudio(type) {
+      if (!soundEnabled) return;
+
+      const targetAudio = (type === 'yay') ? yayAudio : nayAudio;
+      
+      // Reset audio playback position so rapid seat updates fire immediately
+      targetAudio.currentTime = 0;
+
+      targetAudio.play().then(() => {
+        // Successfully played custom MP3 file!
+      }).catch(() => {
+        // FALLBACK: Web Audio Synthesizer if MP3 files are missing or blocked
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          const ctx = new AudioContext();
+
+          const playTone = (freq, startTime, duration) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + startTime);
+            osc.stop(ctx.currentTime + startTime + duration);
+          };
+
+          if (type === 'yay') {
+            // High ascending chime for YAY
+            playTone(523.25, 0, 0.15);    // C5
+            playTone(659.25, 0.12, 0.25);  // E5
+          } else {
+            // Deeper descending chime for NAY
+            playTone(440.00, 0, 0.15);    // A4
+            playTone(349.23, 0.12, 0.25);  // F4
+          }
+        } catch (e) {
+          // Audio waiting for initial user interaction
+        }
+      });
+    }
 
     function adjustSeat(type, delta) {
   if (type === 'yay') {
@@ -429,13 +567,27 @@
   renderUI();
 }
 
-    function setSeats(nay, yay) {
+function setSeats(nay, yay) {
       currentNay = nay;
       currentYay = yay;
       renderUI();
     }
 
     function renderUI() {
+      // Trigger side-specific chime when counts update (skips on initial page load)
+      if (prevYay !== null && prevNay !== null) {
+        if (currentYay > prevYay) {
+          playSeatChangeAudio('yay');
+        } else if (currentNay > prevNay) {
+          playSeatChangeAudio('nay');
+        } else if (prevYay !== currentYay || prevNay !== currentNay) {
+          playSeatChangeAudio('yay');
+        }
+      }
+
+      prevNay = currentNay;
+      prevYay = currentYay;
+
       document.getElementById('nayCount').innerText = currentNay;
       document.getElementById('yayCount').innerText = currentYay;
 
@@ -470,13 +622,13 @@
         pillEl.innerText = 'US-YAY SOLID MAJORITY';
         pillEl.style.color = 'var(--blue-color)';
       } else if (diff > 0) {
-        pillEl.innerText = `LEAN US-YAY (+${diff})`;
+        pillEl.innerText = `DEMOCRACY (+${Math.abs(diff)})`;
         pillEl.style.color = 'var(--blue-color)';
       } else if (diff <= -10) {
         pillEl.innerText = 'US-NAY SOLID MAJORITY';
         pillEl.style.color = 'var(--red-color)';
       } else if (diff < 0) {
-        pillEl.innerText = `LEAN US-NAY (+${Math.abs(diff)})`;
+        pillEl.innerText = `LEANING FASCIST`;
         pillEl.style.color = 'var(--red-color)';
       } else {
         pillEl.innerText = 'TOSS-UP / EVEN (50-50)';
