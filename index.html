@@ -769,24 +769,46 @@
       }, 3050);
     }
 
-    // PRIMARY: Attempt to fetch automated real-time data from civicAPI
+   // Define the holdover seats baseline constant at top of function or script
+   const BASELINE_REP_HOLDOVERS = 31; // 31 Republican seats not up for election in 2026
+    const BASELINE_DEM_HOLDOVERS = 34; // 34 Democratic/Independent seats not up for election in 2026
+
+    // PRIMARY: Fetch real-time total Senate seats directly from civicAPI
     async function fetchFromLiveAPI() {
       try {
-        const res = await fetch("https://civicapi.org/api/v2/elections/2026-us-senate");
+        const res = await fetch("https://civicapi.org/api/v2/race/87528");
         if (!res.ok) return false;
         
         const data = await res.json();
         
-        if (data && data.republicanSeats !== undefined && data.democratSeats !== undefined) {
-          currentNay = data.republicanSeats;
-          currentYay = data.democratSeats;
-          renderUI();
-          console.log("Gauge updated automatically via civicAPI!");
-          return true;
+        if (data && Array.isArray(data.candidates)) {
+          let repSeats = null;
+          let demSeats = null;
+
+          // Parse cumulative party seats directly from civicAPI payload
+          data.candidates.forEach(c => {
+            const party = (c.party || c.name || "").toLowerCase();
+            
+            if (party.includes("republican")) {
+              repSeats = c.seats;
+            } else if (party.includes("democrat") || party.includes("independent")) {
+              demSeats = (demSeats || 0) + (c.seats || 0);
+            }
+          });
+
+          // Verify both numbers exist
+          if (repSeats !== null && demSeats !== null) {
+            currentNay = repSeats;
+            currentYay = demSeats;
+
+            renderUI();
+            console.log(`Gauge updated via civicAPI! GOP/NAY: ${currentNay}, DEM/YAY: ${currentYay}`);
+            return true; // Bypasses Wikipedia fallback
+          }
         }
         return false;
       } catch (e) {
-        return false;
+        return false; // Safely falls back to Wikipedia on error
       }
     }
 
