@@ -726,7 +726,10 @@
       document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
 
       // STATUS PILL TEXT & COLORS
-      if (diff >= 10) {
+      if (currentYay === 52) {
+        pillEl.innerText = 'FETTERMAN PROOF!';
+        pillEl.style.color = 'var(--blue-color)';
+      } else if (diff >= 10) {
         pillEl.innerText = 'US-YAY SOLID MAJORITY';
         pillEl.style.color = 'var(--blue-color)';
       } else if (diff > 0) {
