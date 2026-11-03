@@ -663,13 +663,12 @@
       } catch (e) {}
     }
 
+    // SIMULATOR ADJUSTMENT HANDLER (Independent 1-seat shifts)
     function adjustSeat(type, delta) {
       if (type === 'yay') {
-        currentYay = Math.max(0, Math.min(100, currentYay + delta));
-        currentNay = 100 - currentYay;
+        currentYay = Math.max(0, currentYay + delta);
       } else {
-        currentNay = Math.max(0, Math.min(100, currentNay + delta));
-        currentYay = 100 - currentNay;
+        currentNay = Math.max(0, currentNay + delta);
       }
       renderUI();
     }
@@ -698,33 +697,35 @@
       document.getElementById('nayCount').innerText = currentNay;
       document.getElementById('yayCount').innerText = currentYay;
 
-      const diff = currentYay - currentNay;
+      const diff = currentYay - currentNay; // Positive = YAY leads, Negative = NAY leads
       const balEl = document.getElementById('balCount');
       const pillEl = document.getElementById('statusPill');
       const hubEl = document.getElementById('needleHub');
 
-      // MAJORITY CUSHION CALCULATION (Threshold: 51 seats)
-      if (currentNay >= 51) {
-        const cushion = currentNay - 51;
-        balEl.innerText = `+${cushion} NAY`;
+      // DYNAMIC CUSHION / LEAD CALCULATION
+      if (currentNay > currentYay) {
+        const lead = currentNay - currentYay;
+        balEl.innerText = `+${lead} NAY`;
         balEl.className = 'seat-val nay';
         hubEl.style.fill = 'var(--red-color)';
-      } else if (currentYay >= 51) {
-        const cushion = currentYay - 51;
-        balEl.innerText = `+${cushion} YAY`;
+      } else if (currentYay > currentNay) {
+        const lead = currentYay - currentNay;
+        balEl.innerText = `+${lead} YAY`;
         balEl.className = 'seat-val yay';
         hubEl.style.fill = 'var(--blue-color)';
       } else {
-        // Tied or 50-50 split (no party at 51+)
+        // Exact tie (e.g., 45 vs 45 or 50 vs 50)
         balEl.innerText = 'EVEN';
         balEl.className = 'seat-val bal';
         hubEl.style.fill = 'var(--yellow-color)';
       }
 
-      const rawAngle = diff * 5.2;
+      // NEEDLE ANGLE CALCULATION (Scaled & clamped safely to -80deg to +80deg)
+      const rawAngle = diff * 3.5;
       const angle = Math.max(-80, Math.min(80, rawAngle));
       document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
 
+      // STATUS PILL TEXT & COLORS
       if (diff >= 10) {
         pillEl.innerText = 'US-YAY SOLID MAJORITY';
         pillEl.style.color = 'var(--blue-color)';
@@ -747,7 +748,7 @@
     function triggerSuspensefulSync() {
       const needle = document.getElementById('needle');
       const diff = currentYay - currentNay;
-      const baseAngle = Math.max(-80, Math.min(80, diff * 5.2));
+      const baseAngle = Math.max(-80, Math.min(80, diff * 3.5));
 
       // 1. Playful 1-second wiggle sequence
       needle.style.transform = `rotate(${baseAngle + 7}deg)`;
@@ -768,10 +769,6 @@
         await syncBestAvailableData();
       }, 3050);
     }
-
-   // Define the holdover seats baseline constant at top of function or script
-   const BASELINE_REP_HOLDOVERS = 31; // 31 Republican seats not up for election in 2026
-    const BASELINE_DEM_HOLDOVERS = 34; // 34 Democratic/Independent seats not up for election in 2026
 
     // PRIMARY: Fetch real-time total Senate seats directly from civicAPI
     async function fetchFromLiveAPI() {
