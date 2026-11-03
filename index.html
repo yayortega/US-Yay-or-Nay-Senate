@@ -663,14 +663,12 @@
       } catch (e) {}
     }
 
-    // SIMULATOR ADJUSTMENT HANDLER (Balanced 1-seat shifts)
+    // SIMULATOR ADJUSTMENT HANDLER (Independent 1-seat shifts)
     function adjustSeat(type, delta) {
       if (type === 'yay') {
-        currentYay = Math.max(0, Math.min(100, currentYay + delta));
-        currentNay = 100 - currentYay;
+        currentYay = Math.max(0, currentYay + delta);
       } else {
-        currentNay = Math.max(0, Math.min(100, currentNay + delta));
-        currentYay = 100 - currentNay;
+        currentNay = Math.max(0, currentNay + delta);
       }
       renderUI();
     }
