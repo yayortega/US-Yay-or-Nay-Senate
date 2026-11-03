@@ -663,12 +663,14 @@
       } catch (e) {}
     }
 
-    // SIMULATOR ADJUSTMENT HANDLER (Independent 1-seat shifts)
+    // SIMULATOR ADJUSTMENT HANDLER (Balanced 1-seat shifts)
     function adjustSeat(type, delta) {
       if (type === 'yay') {
-        currentYay = Math.max(0, currentYay + delta);
+        currentYay = Math.max(0, Math.min(100, currentYay + delta));
+        currentNay = 100 - currentYay;
       } else {
-        currentNay = Math.max(0, currentNay + delta);
+        currentNay = Math.max(0, Math.min(100, currentNay + delta));
+        currentYay = 100 - currentNay;
       }
       renderUI();
     }
@@ -680,13 +682,13 @@
     }
 
     function renderUI() {
-      // Trigger side-specific chime when counts update (skips on initial page load)
+      // Direction-aware audio playback trigger
       if (prevYay !== null && prevNay !== null) {
-        if (currentYay > prevYay) {
+        if (currentYay > prevYay || currentNay < prevNay) {
+          // Advantage YAY -> play yay.mp3
           playSeatChangeAudio('yay');
-        } else if (currentNay > prevNay) {
-          playSeatChangeAudio('nay');
-        } else if (prevYay !== currentYay || prevNay !== currentNay) {
+        } else if (currentNay > prevNay || currentYay < prevYay) {
+          // Advantage NAY -> play nay.mp3
           playSeatChangeAudio('nay');
         }
       }
@@ -714,7 +716,7 @@
         balEl.className = 'seat-val yay';
         hubEl.style.fill = 'var(--blue-color)';
       } else {
-        // Exact tie (e.g., 45 vs 45 or 50 vs 50)
+        // Exact tie (e.g., 50 vs 50)
         balEl.innerText = 'EVEN';
         balEl.className = 'seat-val bal';
         hubEl.style.fill = 'var(--yellow-color)';
