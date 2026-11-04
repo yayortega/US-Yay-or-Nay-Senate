@@ -812,15 +812,14 @@
       }
     }
 
-    // DUAL-ENGINE FALLBACK WRAPPER
+    // DUAL-ENGINE FALLBACK WRAPPER (Wikipedia disabled)
     async function syncBestAvailableData() {
-      // 1. Try the real-time API first
+      // Try the real-time civicAPI feed
       const liveSuccess = await fetchFromLiveAPI();
       
-      // 2. If live API fails, fall back to Wikipedia scraper
+      // Wikipedia fallback temporarily disabled
       if (!liveSuccess) {
-        console.log("Live API unavailable, falling back to Wikipedia parser...");
-        await syncWikipediaSenateCounts();
+        console.log("civicAPI currently unavailable. (Wikipedia fallback disabled)");
       }
     }
 
